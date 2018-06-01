@@ -6,6 +6,8 @@ require 'uber_config'
 APIURL='https://worker-aws-us-east-1.iron.io'
 
 payload = UberConfig.load file: ENV['PAYLOAD_FILE'] rescue {}
+num_runners_to_spinup = ENV['runners_to_spin'] || 1000 rescue 1000 #1000 runners to spin up simultaneously
+shutdown_delay = ENV['shutdown_delay'] || 1200 rescue 1200 #seconds
 @token = ENV['token']
 
 HEADERS = {'Authorization': "OAuth #{@token}"}
@@ -43,12 +45,12 @@ end
 CLUSTERS.each do |cluster|
   autoscale_params = get_cluster_autoscale_params(cluster)
   if is_queued_task_in_cluster(cluster)
-    if autoscale_params != nil && autoscale_params['runners_min'] != 1000
-      resize_cluster(cluster, 1000)
+    if autoscale_params != nil && autoscale_params['runners_min'] != num_runners_to_spinup
+      resize_cluster(cluster, num_runners_to_spinup)
     end
   else
     if autoscale_params != nil && autoscale_params['runners_min'] != 0
-      if @last_task_queue_time != nil && (DateTime.now.to_time - DateTime.parse(@last_task_queue_time).to_time > 1200)
+      if @last_task_queue_time != nil && (DateTime.now.to_time - DateTime.parse(@last_task_queue_time).to_time > shutdown_delay)
         resize_cluster(cluster, 0)
       else
         puts "Last task was queued less than 20 minutes ago. Waiting..."
